@@ -16,13 +16,13 @@ type AdminServer struct {
 	password       string
 	weblogicHome   string
 	middlewareHome string
-	cli            *resty.Client
-	managedList    map[string]ManagedServer
+	Cli            *resty.Client
+	ManagedList    map[string]*ManagedServer
 }
 
 func (admin *AdminServer) sortedManagedList() []string {
-	keys := make([]string, 0, len(admin.managedList))
-	for k := range admin.managedList {
+	keys := make([]string, 0, len(admin.ManagedList))
+	for k := range admin.ManagedList {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -31,12 +31,12 @@ func (admin *AdminServer) sortedManagedList() []string {
 }
 
 func (admin *AdminServer) init() {
-	admin.managedList = make(map[string]ManagedServer, 30)
-	admin.cli = resty.New()
-	admin.cli.SetBasicAuth(admin.username, admin.password)
-	admin.cli.SetDisableWarn(true)
-	admin.cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port))
-	resp, err := admin.cli.R().
+	admin.ManagedList = make(map[string]*ManagedServer, 30)
+	admin.Cli = resty.New()
+	admin.Cli.SetBasicAuth(admin.username, admin.password)
+	admin.Cli.SetDisableWarn(true)
+	admin.Cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port))
+	resp, err := admin.Cli.R().
 		EnableTrace().
 		SetHeader("Accept", "application/json").
 		Get("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state,weblogicHome,middlewareHome")
@@ -50,61 +50,73 @@ func (admin *AdminServer) init() {
 
 	items := result["items"].([]interface{})
 	for _, value := range items {
-		admin.managedList[value.(map[string]interface{})["name"].(string)] = ManagedServer{
-			status:         value.(map[string]interface{})["state"].(string),
-			weblogicHome:   value.(map[string]interface{})["weblogicHome"].(string),
-			middlewareHome: value.(map[string]interface{})["middlewareHome"].(string),
-			cli:            admin.cli}
+		admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
+			Name:           value.(map[string]interface{})["name"].(string),
+			Status:         value.(map[string]interface{})["state"].(string),
+			WeblogicHome:   value.(map[string]interface{})["weblogicHome"].(string),
+			MiddlewareHome: value.(map[string]interface{})["middlewareHome"].(string),
+			Cli:            admin.Cli}
 	}
 }
 
 func (admin *AdminServer) status(nameList []string) {
-	fmt.Printf("%-40s %-15s \n", "AdminServer", admin.managedList["AdminServer"].status)
+	fmt.Println()
+	fmt.Printf("%-40s %-15s \n", "AdminServer", admin.ManagedList["AdminServer"].Status)
+	fmt.Println()
 	fmt.Printf("---------------------------------------------------------\n")
+	fmt.Println()
 
 	if nameList == nil {
 		for _, name := range admin.sortedManagedList() {
 			if name != "AdminServer" {
-				fmt.Printf("%-40s %-15s \n", name, admin.managedList[name].status)
+				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
 			}
 		}
 	} else {
 		for _, name := range nameList {
-			value, ok := admin.managedList[name]
+			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				fmt.Printf("%-40s %-15s \n", name, value.status)
+				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
+			}
+		}
+	}
+
+	fmt.Println()
+
+}
+
+func (admin *AdminServer) start(nameList []string) {
+	if nameList == nil {
+		for name := range admin.ManagedList {
+			if name != "AdminServer" {
+				admin.ManagedList[name].startMS()
+			}
+		}
+	} else {
+		for _, name := range nameList {
+			managedserver, ok := admin.ManagedList[name]
+			if ok {
+				managedserver.startMS()
 			}
 		}
 	}
 }
 
-func (admin *AdminServer) start() {
-
-}
-
-func (admin *AdminServer) startAll() {
-	for name := range admin.managedList {
-		if name != "AdminServer" {
-			resp, err := admin.cli.R().
-				SetPathParams(map[string]string{
-					"managedServerName": name,
-				}).
-				Get("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
-
-			if err != nil {
-				panic(err)
+func (admin *AdminServer) stop(nameList []string) {
+	if nameList == nil {
+		for name := range admin.ManagedList {
+			if name != "AdminServer" {
+				admin.ManagedList[name].stopMS()
 			}
-
-			fmt.Println(resp)
+		}
+	} else {
+		for _, name := range nameList {
+			managedserver, ok := admin.ManagedList[name]
+			if ok {
+				managedserver.stopMS()
+			}
 		}
 	}
-
-}
-
-func (admin *AdminServer) stop() {
-}
-
-func (admin *AdminServer) stopAll() {
 }
 
 func (admin *AdminServer) deploy() {
