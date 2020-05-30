@@ -8,11 +8,9 @@ import (
 )
 
 type ManagedServer struct {
-	Name           string
-	Status         string
-	WeblogicHome   string
-	MiddlewareHome string
-	Cli            *resty.Client
+	Name   string
+	Status string
+	Cli    *resty.Client
 }
 
 func (ms *ManagedServer) statusMS() string {
@@ -22,8 +20,10 @@ func (ms *ManagedServer) statusMS() string {
 		return "\033[31m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "TASK IN PROGRESS" {
 		return "\033[33m[" + ms.Status + "]\033[0m"
+	} else if ms.Status == "STARTING" {
+		return "\033[36m[" + ms.Status + "]\033[0m"
 	}
-	return ms.Status
+	return "\033[33m[" + ms.Status + "]\033[0m"
 }
 
 func (ms *ManagedServer) startMS() {
@@ -91,7 +91,7 @@ func (ms *ManagedServer) stopMS() {
 		statusCode, ok := result["status"].(float64)
 		if ok {
 			if statusCode == 400 {
-				ms.Status = "RUNNING"
+				ms.Status = "SHUTDOWN"
 			} else {
 				panic(statusCode)
 			}
@@ -99,5 +99,4 @@ func (ms *ManagedServer) stopMS() {
 			panic(ok)
 		}
 	}
-
 }

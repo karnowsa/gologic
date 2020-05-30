@@ -39,7 +39,7 @@ func (admin *AdminServer) init() {
 	resp, err := admin.Cli.R().
 		EnableTrace().
 		SetHeader("Accept", "application/json").
-		Get("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state,weblogicHome,middlewareHome")
+		Get("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state")
 
 	if err != nil {
 		panic(err)
@@ -49,13 +49,12 @@ func (admin *AdminServer) init() {
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	items := result["items"].([]interface{})
+
 	for _, value := range items {
 		admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
-			Name:           value.(map[string]interface{})["name"].(string),
-			Status:         value.(map[string]interface{})["state"].(string),
-			WeblogicHome:   value.(map[string]interface{})["weblogicHome"].(string),
-			MiddlewareHome: value.(map[string]interface{})["middlewareHome"].(string),
-			Cli:            admin.Cli}
+			Name:   value.(map[string]interface{})["name"].(string),
+			Status: value.(map[string]interface{})["state"].(string),
+			Cli:    admin.Cli}
 	}
 }
 
@@ -106,10 +105,12 @@ func (admin *AdminServer) start(nameList []string) {
 }
 
 func (admin *AdminServer) stop(nameList []string) {
+	fmt.Println()
 	if nameList == nil {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
 				admin.ManagedList[name].stopMS()
+				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
 			}
 		}
 	} else {
@@ -117,9 +118,11 @@ func (admin *AdminServer) stop(nameList []string) {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
 				managedserver.stopMS()
+				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
 			}
 		}
 	}
+	fmt.Println()
 }
 
 func (admin *AdminServer) deploy() {
