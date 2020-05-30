@@ -61,12 +61,11 @@ func (admin *AdminServer) init() {
 
 func (admin *AdminServer) status(nameList []string) {
 	fmt.Println()
-	fmt.Printf("%-40s %-15s \n", "AdminServer", admin.ManagedList["AdminServer"].Status)
-	fmt.Println()
-	fmt.Printf("---------------------------------------------------------\n")
-	fmt.Println()
-
 	if nameList == nil {
+		fmt.Printf("%-40s %-15s \n", "AdminServer", admin.ManagedList["AdminServer"].statusMS())
+		fmt.Println()
+		fmt.Printf("---------------------------------------------------------\n")
+		fmt.Println()
 		for _, name := range admin.sortedManagedList() {
 			if name != "AdminServer" {
 				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
@@ -79,17 +78,19 @@ func (admin *AdminServer) status(nameList []string) {
 				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
 			}
 		}
-	}
 
+	}
 	fmt.Println()
 
 }
 
 func (admin *AdminServer) start(nameList []string) {
+	fmt.Println()
 	if nameList == nil {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
 				admin.ManagedList[name].startMS()
+				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
 			}
 		}
 	} else {
@@ -97,9 +98,11 @@ func (admin *AdminServer) start(nameList []string) {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
 				managedserver.startMS()
+				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
 			}
 		}
 	}
+	fmt.Println()
 }
 
 func (admin *AdminServer) stop(nameList []string) {

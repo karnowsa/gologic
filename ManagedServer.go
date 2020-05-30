@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-resty/resty"
@@ -15,6 +16,13 @@ type ManagedServer struct {
 }
 
 func (ms *ManagedServer) statusMS() string {
+	if ms.Status == "RUNNING" {
+		return "\033[32m[" + ms.Status + "]\033[0m"
+	} else if ms.Status == "SHUTDOWN" {
+		return "\033[31m[" + ms.Status + "]\033[0m"
+	} else if ms.Status == "TASK IN PROGRESS" {
+		return "\033[33m[" + ms.Status + "]\033[0m"
+	}
 	return ms.Status
 }
 
@@ -27,14 +35,32 @@ func (ms *ManagedServer) startMS() {
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
-		SetBody(`{}`).
+		SetBody("{}").
 		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
 
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(resp)
+	var result map[string]interface{}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	taskStatus, ok := result["taskStatus"].(string)
+
+	if ok {
+		ms.Status = taskStatus
+	} else {
+		statusCode, ok := result["status"].(float64)
+		if ok {
+			if statusCode == 400 {
+				ms.Status = "RUNNING"
+			} else {
+				panic(statusCode)
+			}
+		} else {
+			panic(ok)
+		}
+	}
 
 }
 
@@ -47,13 +73,31 @@ func (ms *ManagedServer) stopMS() {
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
-		SetBody(`{}`).
+		SetBody("{}").
 		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/shutdown")
 
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(resp)
+	var result map[string]interface{}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	taskStatus, ok := result["taskStatus"].(string)
+
+	if ok {
+		ms.Status = taskStatus
+	} else {
+		statusCode, ok := result["status"].(float64)
+		if ok {
+			if statusCode == 400 {
+				ms.Status = "RUNNING"
+			} else {
+				panic(statusCode)
+			}
+		} else {
+			panic(ok)
+		}
+	}
 
 }
