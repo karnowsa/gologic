@@ -2,10 +2,19 @@ package main
 
 import (
 	"github.com/alexflint/go-arg"
+	"github.com/tkanos/gonfig"
 )
 
 //go get github.com/alexflint/go-arg
 //go get github.com/go-resty/resty
+//go get github.com/tkanos/gonfig
+
+type configuration struct {
+	IP       string
+	Port     int
+	Username string
+	Password string
+}
 
 type args struct {
 	Command string   `arg:"positional" help:"status, start, stop"`
@@ -21,10 +30,16 @@ func (args) Description() string {
 }
 
 func main() {
+	config := configuration{}
+	err := gonfig.GetConf("/etc/gologic.conf", &config)
+	if err != nil {
+		panic(err)
+	}
+
 	var args args
 	arg.MustParse(&args)
 
-	var admin = AdminServer{ipAdress: "127.0.0.1", port: 7001, username: "weblogic", password: "password123"}
+	var admin = AdminServer{ipAdress: config.IP, port: config.Port, username: config.Username, password: config.Password}
 	admin.init()
 
 	switch args.Command {

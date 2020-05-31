@@ -74,7 +74,7 @@ func (ms *ManagedServer) stopMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/shutdown")
+		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown")
 
 	if err != nil {
 		panic(err)

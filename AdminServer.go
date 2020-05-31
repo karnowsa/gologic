@@ -125,7 +125,69 @@ func (admin *AdminServer) stop(nameList []string) {
 	fmt.Println()
 }
 
-func (admin *AdminServer) deploy() {
+func (admin *AdminServer) deployments() {
+	resp, err := admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetBody(`{
+			links: [], fields: [],
+			children: {
+			  serverRuntimes: {
+				links: [], fields: [ 'name' ],
+				children: {
+				  applicationRuntimes: {
+					links: [], fields: [ 'name' ],
+					name: [ 'fairShare', 'basicapp' ],
+					children: {
+					  componentRuntimes: {
+						links: [], fields: [ 'name', 'type' ],
+						children: {
+						  servlets: {
+							links: [],
+							fields: [
+							  'name',
+							  'executionTimeHigh',
+							  'executionTimeLow',
+							  'executionTimeAverage',
+							  'invocationTotalCount'
+							]
+						  }
+						}
+					  }
+					}
+				  },
+				  partitionRuntimes: {
+					links: [], fields: [ 'name' ],
+					children: {
+					  applicationRuntimes: {
+						links: [], fields: [ 'name' ],
+						name: [ 'fairShare', 'basicapp' ],
+						children: {
+						  componentRuntimes: {
+							links: [], fields: [ 'name', 'type' ],
+							children: {
+							  servlets: {
+								links: [],
+								fields: ['name']
+							  }
+							}
+						  }
+						}
+					  }
+					}
+				  }
+				}
+			  }
+			}
+		  }`).
+		Post("/management/weblogic/latest/domainRuntime/search")
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(resp)
 }
 
 func (admin *AdminServer) createManagedServer() {
