@@ -10,14 +10,14 @@ import (
 )
 
 type AdminServer struct {
-	ipAdress       string
-	port           int
-	username       string
-	password       string
-	weblogicHome   string
-	middlewareHome string
-	Cli            *resty.Client
-	ManagedList    map[string]*ManagedServer
+	name        string
+	ipAdress    string
+	port        int
+	username    string
+	password    string
+	statusAdmin string
+	Cli         *resty.Client
+	ManagedList map[string]*ManagedServer
 }
 
 func (admin *AdminServer) sortedManagedList() []string {
@@ -31,37 +31,82 @@ func (admin *AdminServer) sortedManagedList() []string {
 }
 
 func (admin *AdminServer) init() {
+	var resp *resty.Response
+	var err error
+	var result map[string]interface{}
+
 	admin.ManagedList = make(map[string]*ManagedServer, 30)
 	admin.Cli = resty.New()
 	admin.Cli.SetBasicAuth(admin.username, admin.password)
 	admin.Cli.SetDisableWarn(true)
-	admin.Cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port))
-	resp, err := admin.Cli.R().
-		EnableTrace().
+	admin.Cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port) + "/management/weblogic/latest")
+
+	admin.checkAdminStatus()
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
-		Get("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state")
+		SetHeader("X-Requested-By", "gologic").
+		Get("/edit")
 
 	if err != nil {
 		panic(err)
 	}
 
-	var result map[string]interface{}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	admin.name = result["adminServerName"].(string)
+
+	resp, err = admin.Cli.R().
+		EnableTrace().
+		SetHeader("Accept", "application/json").
+		Get("/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state")
+
+	if err != nil {
+		panic(err)
+	}
+
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	items := result["items"].([]interface{})
 
 	for _, value := range items {
-		admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
-			Name:   value.(map[string]interface{})["name"].(string),
-			Status: value.(map[string]interface{})["state"].(string),
-			Cli:    admin.Cli}
+		if value.(map[string]interface{})["name"].(string) != admin.name {
+			admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
+				Name:   value.(map[string]interface{})["name"].(string),
+				Status: value.(map[string]interface{})["state"].(string),
+				Cli:    admin.Cli}
+		}
 	}
 }
 
-func (admin *AdminServer) status(nameList []string) {
+func (admin *AdminServer) checkAdminStatus() {
+	_, err := admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/")
+
+	if err != nil {
+		panic(err)
+	} else {
+		admin.statusAdmin = "RUNNING"
+	}
+}
+
+func (admin *AdminServer) status() string {
+	if admin.statusAdmin == "RUNNING" {
+		return "\033[32m[" + admin.statusAdmin + "]\033[0m"
+	} else if admin.statusAdmin == "SHUTDOWN" {
+		return "\033[31m[" + admin.statusAdmin + "]\033[0m"
+	}
+	return "\033[33m[" + admin.statusAdmin + "]\033[0m"
+}
+
+func (admin *AdminServer) statusAll(nameList []string) {
 	fmt.Println()
 	if nameList == nil {
-		fmt.Printf("%-40s %-15s \n", "AdminServer", admin.ManagedList["AdminServer"].statusMS())
+		fmt.Printf("%-40s %-15s \n", admin.name, admin.status())
 		fmt.Println()
 		fmt.Printf("---------------------------------------------------------\n")
 		fmt.Println()
@@ -98,6 +143,8 @@ func (admin *AdminServer) start(nameList []string) {
 			if ok {
 				managedserver.startMS()
 				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
+			} else {
+				fmt.Printf("%-40s %-15s \n", name, "Doesn't exists")
 			}
 		}
 	}
@@ -119,6 +166,8 @@ func (admin *AdminServer) stop(nameList []string) {
 			if ok {
 				managedserver.stopMS()
 				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
+			} else {
+				fmt.Printf("%-40s %-15s \n", name, "Doesn't exists")
 			}
 		}
 	}
@@ -126,68 +175,7 @@ func (admin *AdminServer) stop(nameList []string) {
 }
 
 func (admin *AdminServer) deployments() {
-	resp, err := admin.Cli.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json").
-		SetHeader("X-Requested-By", "gologic").
-		SetBody(`{
-			links: [], fields: [],
-			children: {
-			  serverRuntimes: {
-				links: [], fields: [ 'name' ],
-				children: {
-				  applicationRuntimes: {
-					links: [], fields: [ 'name' ],
-					name: [ 'fairShare', 'basicapp' ],
-					children: {
-					  componentRuntimes: {
-						links: [], fields: [ 'name', 'type' ],
-						children: {
-						  servlets: {
-							links: [],
-							fields: [
-							  'name',
-							  'executionTimeHigh',
-							  'executionTimeLow',
-							  'executionTimeAverage',
-							  'invocationTotalCount'
-							]
-						  }
-						}
-					  }
-					}
-				  },
-				  partitionRuntimes: {
-					links: [], fields: [ 'name' ],
-					children: {
-					  applicationRuntimes: {
-						links: [], fields: [ 'name' ],
-						name: [ 'fairShare', 'basicapp' ],
-						children: {
-						  componentRuntimes: {
-							links: [], fields: [ 'name', 'type' ],
-							children: {
-							  servlets: {
-								links: [],
-								fields: ['name']
-							  }
-							}
-						  }
-						}
-					  }
-					}
-				  }
-				}
-			  }
-			}
-		  }`).
-		Post("/management/weblogic/latest/domainRuntime/search")
 
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(resp)
 }
 
 func (admin *AdminServer) createManagedServer() {

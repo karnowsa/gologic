@@ -36,7 +36,7 @@ func (ms *ManagedServer) startMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
 
 	if err != nil {
 		panic(err)
@@ -74,7 +74,7 @@ func (ms *ManagedServer) stopMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/management/weblogic/latest/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown")
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown")
 
 	if err != nil {
 		panic(err)

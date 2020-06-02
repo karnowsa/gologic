@@ -44,7 +44,7 @@ func main() {
 
 	switch args.Command {
 	case "status":
-		admin.status(args.List)
+		admin.statusAll(args.List)
 	case "start":
 		admin.start(args.List)
 	case "stop":
