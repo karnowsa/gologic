@@ -23,7 +23,7 @@ go build gologic.go AdminServer.go ManagedServer.go
 
 ## Installation
 
-You need to create a config file at /etc/gologic.conf:
+You need to create a config file at /etc/gologic.conf.  
 With the followed content:
 ```json
 {
