@@ -4,7 +4,7 @@
   * Get status of Admin and Managed Server
   * Simple commands to start and stop Managed Server
   * Specify a list of Servers
-  * Print info about Weblogic Servers
+  * Print informations about Weblogic Server
 
 
 #### Supported Go Versions
