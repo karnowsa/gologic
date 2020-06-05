@@ -94,7 +94,7 @@ func (admin *AdminServer) checkAdminStatus() {
 	}
 }
 
-func (admin *AdminServer) status() string {
+func (admin *AdminServer) getStatus() string {
 	if admin.statusAdmin == "RUNNING" {
 		return "\033[32m[" + admin.statusAdmin + "]\033[0m"
 	} else if admin.statusAdmin == "SHUTDOWN" {
@@ -103,38 +103,13 @@ func (admin *AdminServer) status() string {
 	return "\033[33m[" + admin.statusAdmin + "]\033[0m"
 }
 
-func (admin *AdminServer) statusAll(nameList []string) {
-	fmt.Println()
-	if nameList == nil {
-		fmt.Printf("%-40s %-15s \n", admin.name, admin.status())
-		fmt.Println()
-		fmt.Printf("---------------------------------------------------------\n")
-		fmt.Println()
-		for _, name := range admin.sortedManagedList() {
-			if name != "AdminServer" {
-				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
-			}
-		}
-	} else {
-		for _, name := range nameList {
-			managedserver, ok := admin.ManagedList[name]
-			if ok {
-				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
-			}
-		}
-
-	}
-	fmt.Println()
-
-}
-
 func (admin *AdminServer) start(nameList []string) {
 	fmt.Println()
 	if nameList == nil {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
 				admin.ManagedList[name].startMS()
-				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
 			}
 		}
 	} else {
@@ -142,9 +117,9 @@ func (admin *AdminServer) start(nameList []string) {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
 				managedserver.startMS()
-				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
+				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
 			} else {
-				fmt.Printf("%-40s %-15s \n", name, "Doesn't exists")
+				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
 			}
 		}
 	}
@@ -157,7 +132,7 @@ func (admin *AdminServer) stop(nameList []string) {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
 				admin.ManagedList[name].stopMS()
-				fmt.Printf("%-40s %-15s \n", name, admin.ManagedList[name].statusMS())
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
 			}
 		}
 	} else {
@@ -165,17 +140,70 @@ func (admin *AdminServer) stop(nameList []string) {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
 				managedserver.stopMS()
-				fmt.Printf("%-40s %-15s \n", name, managedserver.statusMS())
+				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
 			} else {
-				fmt.Printf("%-40s %-15s \n", name, "Doesn't exists")
+				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
 			}
 		}
 	}
 	fmt.Println()
 }
 
-func (admin *AdminServer) deployments() {
+//A list of Managed Server can be passed to this receiver
+func (admin *AdminServer) printStatus(nameList []string) {
+	fmt.Println()
+	if nameList == nil {
+		fmt.Printf("%-40s %-15s \n", admin.name, admin.getStatus())
+		fmt.Println()
+		fmt.Printf("---------------------------------------------------------\n")
+		fmt.Println()
+		for _, name := range admin.sortedManagedList() {
+			if name != "AdminServer" {
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
+			}
+		}
+	} else {
+		for _, name := range nameList {
+			managedserver, ok := admin.ManagedList[name]
+			if ok {
+				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+			}
+		}
 
+	}
+	fmt.Println()
+
+}
+
+func (admin *AdminServer) printInfo() {
+	var result map[string]interface{}
+	var resp *resty.Response
+
+	resp, err := admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/domainConfig?links=none&fields=name,rootDirectory")
+	if err != nil {
+		panic(err)
+	}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	fmt.Printf("%-40s %s \n", "DomainName", result["name"].(string))
+	fmt.Printf("%-40s %s \n", "DomainHome", result["rootDirectory"].(string))
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/serverRuntime/JVMRuntime?links=none&fields=javaVersion,OSName,OSVersion")
+	if err != nil {
+		panic(err)
+	}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	fmt.Printf("%-40s %s\n", "Java Version", result["javaVersion"].(string))
+	fmt.Printf("%-40s %s %s\n", "OS Version", result["OSName"].(string), result["OSVersion"].(string))
 }
 
 func (admin *AdminServer) createManagedServer() {

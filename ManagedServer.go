@@ -13,7 +13,7 @@ type ManagedServer struct {
 	Cli    *resty.Client
 }
 
-func (ms *ManagedServer) statusMS() string {
+func (ms *ManagedServer) getStatus() string {
 	if ms.Status == "RUNNING" {
 		return "\033[32m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "SHUTDOWN" {
@@ -27,6 +27,8 @@ func (ms *ManagedServer) statusMS() string {
 }
 
 func (ms *ManagedServer) startMS() {
+	var result map[string]interface{}
+
 	resp, err := ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
@@ -42,7 +44,6 @@ func (ms *ManagedServer) startMS() {
 		panic(err)
 	}
 
-	var result map[string]interface{}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	taskStatus, ok := result["taskStatus"].(string)

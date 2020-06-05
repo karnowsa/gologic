@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/alexflint/go-arg"
 	"github.com/tkanos/gonfig"
 )
@@ -30,8 +32,9 @@ func (args) Description() string {
 }
 
 func main() {
+	var configPath string = "/etc/gologic.conf"
 	config := configuration{}
-	err := gonfig.GetConf("/etc/gologic.conf", &config)
+	err := gonfig.GetConf(configPath, &config)
 	if err != nil {
 		panic(err)
 	}
@@ -44,12 +47,15 @@ func main() {
 
 	switch args.Command {
 	case "status":
-		admin.statusAll(args.List)
+		admin.printStatus(args.List)
 	case "start":
 		admin.start(args.List)
 	case "stop":
 		admin.stop(args.List)
+	case "info":
+		admin.printInfo()
+		fmt.Printf("%-40s %s\n", "Configfile", configPath)
 	default:
-
+		fmt.Println("Usage guide")
 	}
 }
