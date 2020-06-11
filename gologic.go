@@ -55,6 +55,10 @@ func main() {
 	case "info":
 		admin.printInfo()
 		fmt.Printf("%-40s %s\n", "Configfile", configPath)
+	case "add":
+		admin.createManagedServer(args.List[0], args.List[1], args.List[2])
+	case "deployment":
+		admin.printDeployments()
 	default:
 		fmt.Println("Usage guide")
 	}

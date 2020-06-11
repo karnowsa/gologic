@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/go-resty/resty"
 )
@@ -167,6 +168,8 @@ func (admin *AdminServer) printStatus(nameList []string) {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
 				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+			} else if name == admin.name {
+				fmt.Printf("%-40s %s \n", name, admin.getStatus())
 			}
 		}
 
@@ -189,6 +192,7 @@ func (admin *AdminServer) printInfo() {
 	}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
+	fmt.Printf("%-40s %s \n", "AdminServer", admin.ipAdress+":"+strconv.Itoa(admin.port))
 	fmt.Printf("%-40s %s \n", "DomainName", result["name"].(string))
 	fmt.Printf("%-40s %s \n", "DomainHome", result["rootDirectory"].(string))
 
@@ -206,5 +210,93 @@ func (admin *AdminServer) printInfo() {
 	fmt.Printf("%-40s %s %s\n", "OS Version", result["OSName"].(string), result["OSVersion"].(string))
 }
 
-func (admin *AdminServer) createManagedServer() {
+func (admin *AdminServer) printDeployments() {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/domainRuntime/deploymentManager/appDeploymentRuntimes?links=none")
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(resp)
+
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+}
+
+func (admin *AdminServer) createManagedServer(name string, listenAddress string, listenPort string) {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	//Get a form to create a managed server
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetBody("{}").
+		Post("/edit/changeManager/startEdit")
+
+	if err != nil {
+		panic(err)
+	}
+
+	//Get a form to create a managed server
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/edit/serverCreateForm?links=none")
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Creating server (%v, %v, %v)\n", name, listenAddress, listenPort)
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetBody(`{ "name":"` + name + `", "listenAddress":"` + listenAddress + `", "listenPort":` + listenPort + `}`).
+		Post("/edit/servers")
+
+	if err != nil {
+		panic(err)
+	}
+
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	if fmt.Sprintf("%v", resp) != "{}" {
+		if strings.Contains(result["detail"].(string), "already exists") {
+			fmt.Printf("The Managed Server %v already exists!\n", name)
+		} else {
+			fmt.Printf("Couldn't create Server %v!\n", name)
+		}
+	}
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetBody("{}").
+		Post("/edit/changeManager/activate")
+
+	if err != nil {
+		panic(err)
+	}
+
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	if fmt.Sprintf("%v", resp) != "{}" {
+		fmt.Println("Couldn't activate changes!")
+	}
+
 }
