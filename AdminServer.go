@@ -153,7 +153,7 @@ func (admin *AdminServer) stop(nameList []string) {
 //A list of Managed Server can be passed to this receiver
 func (admin *AdminServer) printStatus(nameList []string) {
 	fmt.Println()
-	if nameList == nil {
+	if len(nameList) <= 0 {
 		fmt.Printf("%-40s %-15s \n", admin.name, admin.getStatus())
 		fmt.Println()
 		fmt.Printf("---------------------------------------------------------\n")

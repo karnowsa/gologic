@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/alexflint/go-arg"
+	"github.com/spf13/cobra"
 	"github.com/tkanos/gonfig"
 )
 
 //go get github.com/alexflint/go-arg
 //go get github.com/go-resty/resty
 //go get github.com/tkanos/gonfig
+//"github.com/spf13/cobra"
 
 type configuration struct {
 	IP       string
@@ -46,8 +48,6 @@ func main() {
 	admin.init()
 
 	switch args.Command {
-	case "status":
-		admin.printStatus(args.List)
 	case "start":
 		admin.start(args.List)
 	case "stop":
@@ -62,4 +62,20 @@ func main() {
 	default:
 		fmt.Println("Usage guide")
 	}
+
+	var cmdStatus = &cobra.Command{
+		Use:   "status [string to status]",
+		Short: "status anything to the screen",
+		Long: `status is for printing anything back to the screen.
+  For many years people have printed back to the screen.`,
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(len(args))
+			admin.printStatus(args)
+		},
+	}
+
+	var rootCmd = &cobra.Command{Use: "gologic"}
+	rootCmd.AddCommand(cmdStatus)
+	rootCmd.Execute()
 }
