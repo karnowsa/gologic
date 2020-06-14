@@ -1,4 +1,4 @@
-package main
+package gologic
 
 import (
 	"encoding/json"
@@ -10,6 +10,14 @@ import (
 	"github.com/go-resty/resty"
 )
 
+/*
+AdminServer is a struct, which represents the Weblogic AdminServer.
+name: is the Admin Server Name
+ipAdress: is the IPv4 Address of the Server
+username: username of a Administration Account
+password: its the password of the account
+
+*/
 type AdminServer struct {
 	name        string
 	ipAdress    string
@@ -31,10 +39,17 @@ func (admin *AdminServer) sortedManagedList() []string {
 	return keys
 }
 
-func (admin *AdminServer) init() {
+//Init checks the connection to the AdminServer and it collect a list of ManagedServer from the AdminServer
+func Init(ip string, port int, username string, password string) AdminServer {
 	var resp *resty.Response
 	var err error
 	var result map[string]interface{}
+	var admin AdminServer
+
+	admin.ipAdress = ip
+	admin.port = port
+	admin.username = username
+	admin.password = password
 
 	admin.ManagedList = make(map[string]*ManagedServer, 30)
 	admin.Cli = resty.New()
@@ -79,8 +94,11 @@ func (admin *AdminServer) init() {
 				Cli:    admin.Cli}
 		}
 	}
+
+	return admin
 }
 
+//checkAdminStatus checks the status of the AdminServer
 func (admin *AdminServer) checkAdminStatus() {
 	_, err := admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
@@ -95,7 +113,8 @@ func (admin *AdminServer) checkAdminStatus() {
 	}
 }
 
-func (admin *AdminServer) getStatus() string {
+//GetStatus returns the AdminServer Status with color
+func (admin *AdminServer) GetStatus() string {
 	if admin.statusAdmin == "RUNNING" {
 		return "\033[32m[" + admin.statusAdmin + "]\033[0m"
 	} else if admin.statusAdmin == "SHUTDOWN" {
@@ -104,72 +123,74 @@ func (admin *AdminServer) getStatus() string {
 	return "\033[33m[" + admin.statusAdmin + "]\033[0m"
 }
 
-func (admin *AdminServer) start(nameList []string) {
-	fmt.Println()
-	if nameList == nil {
-		for name := range admin.ManagedList {
-			if name != "AdminServer" {
-				admin.ManagedList[name].startMS()
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
-			}
-		}
-	} else {
-		for _, name := range nameList {
-			managedserver, ok := admin.ManagedList[name]
-			if ok {
-				managedserver.startMS()
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
-			} else {
-				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
-			}
-		}
-	}
-	fmt.Println()
-}
-
-func (admin *AdminServer) stop(nameList []string) {
-	fmt.Println()
-	if nameList == nil {
-		for name := range admin.ManagedList {
-			if name != "AdminServer" {
-				admin.ManagedList[name].stopMS()
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
-			}
-		}
-	} else {
-		for _, name := range nameList {
-			managedserver, ok := admin.ManagedList[name]
-			if ok {
-				managedserver.stopMS()
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
-			} else {
-				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
-			}
-		}
-	}
-	fmt.Println()
-}
-
-//A list of Managed Server can be passed to this receiver
-func (admin *AdminServer) printStatus(nameList []string) {
+//Start starts a list of ManagedServer or when the list is empty, its stops every ManagedServer
+func (admin *AdminServer) Start(nameList []string) {
 	fmt.Println()
 	if len(nameList) <= 0 {
-		fmt.Printf("%-40s %-15s \n", admin.name, admin.getStatus())
+		for name := range admin.ManagedList {
+			if name != "AdminServer" {
+				admin.ManagedList[name].StartMS()
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].GetStatus())
+			}
+		}
+	} else {
+		for _, name := range nameList {
+			managedserver, ok := admin.ManagedList[name]
+			if ok {
+				managedserver.StartMS()
+				fmt.Printf("%-40s %s \n", name, managedserver.GetStatus())
+			} else {
+				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
+			}
+		}
+	}
+	fmt.Println()
+}
+
+//Stop stops a list of servers or when the list is empty, its stops every ManagedServer
+func (admin *AdminServer) Stop(nameList []string) {
+	fmt.Println()
+	if len(nameList) <= 0 {
+		for name := range admin.ManagedList {
+			if name != "AdminServer" {
+				admin.ManagedList[name].StopMS()
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].GetStatus())
+			}
+		}
+	} else {
+		for _, name := range nameList {
+			managedserver, ok := admin.ManagedList[name]
+			if ok {
+				managedserver.StopMS()
+				fmt.Printf("%-40s %s \n", name, managedserver.GetStatus())
+			} else {
+				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
+			}
+		}
+	}
+	fmt.Println()
+}
+
+//PrintStatus prints the status of all Servers or a list of specific servers
+func (admin *AdminServer) PrintStatus(nameList []string) {
+	fmt.Println()
+	if len(nameList) <= 0 {
+		fmt.Printf("%-40s %-15s \n", admin.name, admin.GetStatus())
 		fmt.Println()
 		fmt.Printf("---------------------------------------------------------\n")
 		fmt.Println()
 		for _, name := range admin.sortedManagedList() {
 			if name != "AdminServer" {
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
+				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+				fmt.Printf("%-40s %s \n", name, managedserver.GetStatus())
 			} else if name == admin.name {
-				fmt.Printf("%-40s %s \n", name, admin.getStatus())
+				fmt.Printf("%-40s %s \n", name, admin.GetStatus())
 			}
 		}
 
@@ -178,7 +199,8 @@ func (admin *AdminServer) printStatus(nameList []string) {
 
 }
 
-func (admin *AdminServer) printInfo() {
+//PrintInfo prints informations about the AdminServer
+func (admin *AdminServer) PrintInfo() {
 	var result map[string]interface{}
 	var resp *resty.Response
 
@@ -206,8 +228,8 @@ func (admin *AdminServer) printInfo() {
 	}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
-	fmt.Printf("%-40s %s\n", "Java Version", result["javaVersion"].(string))
-	fmt.Printf("%-40s %s %s\n", "OS Version", result["OSName"].(string), result["OSVersion"].(string))
+	fmt.Printf("%-40s %s\n", "JavaVersion", result["javaVersion"].(string))
+	fmt.Printf("%-40s %s %s\n", "OSVersion", result["OSName"].(string), result["OSVersion"].(string))
 }
 
 func (admin *AdminServer) printDeployments() {
@@ -231,7 +253,8 @@ func (admin *AdminServer) printDeployments() {
 
 }
 
-func (admin *AdminServer) createManagedServer(name string, listenAddress string, listenPort string) {
+//CreateManagedServer creates a ManagedServer with the parameter name (name of the server), listenAddress, listenPort
+func (admin *AdminServer) CreateManagedServer(name string, listenAddress string, listenPort string) {
 	var result map[string]interface{}
 	var resp *resty.Response
 	var err error
@@ -242,7 +265,7 @@ func (admin *AdminServer) createManagedServer(name string, listenAddress string,
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody("{}").
-		Post("/edit/changeManager/startEdit")
+		Post("/edit/changeManager/StartEdit")
 
 	if err != nil {
 		panic(err)

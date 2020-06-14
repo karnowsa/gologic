@@ -1,4 +1,4 @@
-package main
+package gologic
 
 import (
 	"encoding/json"
@@ -7,26 +7,32 @@ import (
 	"github.com/go-resty/resty"
 )
 
+/*ManagedServer is a a struct to save Weblogic ManagedServer
+Name: It has a name
+Status: And a status with color (Running, Shutdown...)
+*/
 type ManagedServer struct {
 	Name   string
 	Status string
 	Cli    *resty.Client
 }
 
-func (ms *ManagedServer) getStatus() string {
+//GetStatus returns the status of the ManagedServer with colors
+func (ms *ManagedServer) GetStatus() string {
 	if ms.Status == "RUNNING" {
 		return "\033[32m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "SHUTDOWN" {
 		return "\033[31m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "TASK IN PROGRESS" {
 		return "\033[33m[" + ms.Status + "]\033[0m"
-	} else if ms.Status == "STARTING" {
+	} else if ms.Status == "StartING" {
 		return "\033[36m[" + ms.Status + "]\033[0m"
 	}
 	return "\033[33m[" + ms.Status + "]\033[0m"
 }
 
-func (ms *ManagedServer) startMS() {
+//StartMS starts a list of ManagedServer, when its empty then its starts all ManagedServer
+func (ms *ManagedServer) StartMS() {
 	var result map[string]interface{}
 
 	resp, err := ms.Cli.R().
@@ -65,7 +71,10 @@ func (ms *ManagedServer) startMS() {
 
 }
 
-func (ms *ManagedServer) stopMS() {
+//StopMS stops a list of ManagedServer, when its empty then its Stops all ManagedServer
+func (ms *ManagedServer) StopMS() {
+	var result map[string]interface{}
+
 	resp, err := ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
@@ -80,8 +89,6 @@ func (ms *ManagedServer) stopMS() {
 	if err != nil {
 		panic(err)
 	}
-
-	var result map[string]interface{}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	taskStatus, ok := result["taskStatus"].(string)
