@@ -32,10 +32,12 @@ func (ms *ManagedServer) GetStatus() string {
 }
 
 //StartMS starts a list of ManagedServer, when its empty then its starts all ManagedServer
-func (ms *ManagedServer) StartMS() {
+func (ms *ManagedServer) StartMS() error {
 	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
 
-	resp, err := ms.Cli.R().
+	if resp, err = ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
 		}).
@@ -44,9 +46,7 @@ func (ms *ManagedServer) StartMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
-
-	if err != nil {
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start"); err != nil {
 		panic(err)
 	}
 
@@ -62,20 +62,22 @@ func (ms *ManagedServer) StartMS() {
 			if statusCode == 400 {
 				ms.Status = "RUNNING"
 			} else {
-				panic(statusCode)
+				return fmt.Errorf("StartMS() HTTP Statuscode is %v", statusCode)
 			}
 		} else {
-			panic(ok)
+			return fmt.Errorf("StartMS() ok is %v", ok)
 		}
 	}
-
+	return nil
 }
 
 //StopMS stops a list of ManagedServer, when its empty then its Stops all ManagedServer
-func (ms *ManagedServer) StopMS() {
+func (ms *ManagedServer) StopMS() error {
 	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
 
-	resp, err := ms.Cli.R().
+	if resp, err = ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
 		}).
@@ -84,10 +86,8 @@ func (ms *ManagedServer) StopMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown")
-
-	if err != nil {
-		panic(err)
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown"); err != nil {
+		return err
 	}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
@@ -101,10 +101,11 @@ func (ms *ManagedServer) StopMS() {
 			if statusCode == 400 {
 				ms.Status = "SHUTDOWN"
 			} else {
-				panic(statusCode)
+				return fmt.Errorf("StopMS() HTTP Statuscode is %v", statusCode)
 			}
 		} else {
-			panic(ok)
+			return fmt.Errorf("StopMS() ok is %v", ok)
 		}
 	}
+	return nil
 }
