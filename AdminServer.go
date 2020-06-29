@@ -256,8 +256,6 @@ func (admin *AdminServer) PrintDeployments() {
 		panic(err)
 	}
 
-	fmt.Println(resp)
-
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	items := result["items"].([]interface{})
@@ -271,7 +269,6 @@ func (admin *AdminServer) PrintDeployments() {
 	} else {
 		fmt.Println("No Deployments found")
 	}
-
 }
 
 //CreateManagedServer creates a ManagedServer with the parameter name (name of the server), listenAddress, listenPort
