@@ -179,6 +179,42 @@ func (admin *AdminServer) Stop(nameList []string) {
 	fmt.Println()
 }
 
+//Deploy a Java Application to a specific cluster or server
+func (admin *AdminServer) Deploy(path string, targets string) {
+	/* 	{
+	name: null,
+	applicationPath : '/app/hello-world.war',
+	targets: ['DockerCluster'],
+	plan: null,
+	deploymentOptions: {}
+	} */
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetBody(`{
+			name: null,
+			applicationPath : '/app/hello-world.war',
+			targets: ['DockerCluster'],
+			plan: null,
+			deploymentOptions: {}
+		}`).
+		Post("/domainRuntime/deploymentManager/deploy")
+
+	if err != nil {
+		panic(err)
+	}
+
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	fmt.Println(resp)
+
+}
+
 //PrintStatus prints the status of all Servers or a list of specific servers
 func (admin *AdminServer) PrintStatus(nameList []string) {
 	fmt.Println()
@@ -250,7 +286,7 @@ func (admin *AdminServer) PrintDeployments() {
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
-		Get("/domainRuntime/deploymentManager/appDeploymentRuntimes?links=none")
+		Get("/serverConfig/appDeployments?links=none")
 
 	if err != nil {
 		panic(err)
@@ -258,16 +294,22 @@ func (admin *AdminServer) PrintDeployments() {
 
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
-	items := result["items"].([]interface{})
-	if len(items) > 0 {
-		for _, value := range items {
-			applicationEntry := value.(map[string]interface{})
+	switch items := result["items"].(type) {
+	case nil:
+		panic(resp)
+	case []interface{}:
+		if len(items) > 0 {
+			for _, value := range items {
+				applicationEntry := value.(map[string]interface{})
 
-			fmt.Printf("%-20s %-10v \n", applicationEntry["name"], applicationEntry["applicationVersion"])
+				fmt.Printf("%-20v %-10v \n", applicationEntry["applicationName"], applicationEntry["versionIdentifier"])
+			}
+
+		} else {
+			fmt.Println("No Deployments found")
 		}
-
-	} else {
-		fmt.Println("No Deployments found")
+	default:
+		fmt.Println("type unknown") // here v has type interface{}
 	}
 }
 
