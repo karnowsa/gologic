@@ -301,8 +301,7 @@ func (admin *AdminServer) PrintDeployments() {
 		if len(items) > 0 {
 			for _, value := range items {
 				applicationEntry := value.(map[string]interface{})
-
-				fmt.Printf("%-20v %-10v \n", applicationEntry["applicationName"], applicationEntry["versionIdentifier"])
+				fmt.Printf("%-45v %-10v %-5v %-70v %-20v\n", applicationEntry["applicationName"], applicationEntry["versionIdentifier"], applicationEntry["moduleType"], applicationEntry["sourcePath"], "asdf")
 			}
 
 		} else {
