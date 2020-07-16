@@ -180,39 +180,38 @@ func (admin *AdminServer) Stop(nameList []string) {
 }
 
 //Deploy a Java Application to a specific cluster or server
-func (admin *AdminServer) Deploy(path string, targets string) {
-	/* 	{
-	name: null,
-	applicationPath : '/app/hello-world.war',
-	targets: ['DockerCluster'],
-	plan: null,
-	deploymentOptions: {}
-	} */
+func (admin *AdminServer) Deploy(target []string, pathSlice []string) {
 	var result map[string]interface{}
 	var resp *resty.Response
+	var targetJSON []byte
 	var err error
 
-	resp, err = admin.Cli.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json").
-		SetHeader("X-Requested-By", "gologic").
-		SetBody(`{
+	if targetJSON, err = json.Marshal(target); err != nil {
+		fmt.Println(err)
+	}
+
+	for _, path := range pathSlice {
+		resp, err = admin.Cli.R().
+			SetHeader("Content-Type", "application/json").
+			SetHeader("Accept", "application/json").
+			SetHeader("X-Requested-By", "gologic").
+			SetBody(`{
 			name: null,
-			applicationPath : '/app/hello-world.war',
-			targets: ['DockerCluster'],
+			applicationPath : '` + path + `',
+			targets: ` + string(targetJSON) + `,
 			plan: null,
 			deploymentOptions: {}
 		}`).
-		Post("/domainRuntime/deploymentManager/deploy")
+			Post("/domainRuntime/deploymentManager/deploy")
 
-	if err != nil {
-		panic(err)
+		if err != nil {
+			panic(err)
+		}
+
+		json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+		fmt.Println(resp)
 	}
-
-	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
-
-	fmt.Println(resp)
-
 }
 
 //PrintStatus prints the status of all Servers or a list of specific servers
