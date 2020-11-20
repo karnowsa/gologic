@@ -1,10 +1,10 @@
-package main
+package github.com/karnowsa/gologic
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-resty/resty"
+	"github.com/go-resty/resty/v2"
 )
 
 type ManagedServer struct {
