@@ -1,4 +1,4 @@
-package github.com/karnowsa/gologic
+package gologic
 
 type NodeManager struct {
 	X int

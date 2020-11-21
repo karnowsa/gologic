@@ -1,4 +1,4 @@
-package	github.com/karnowsa/gologic 
+package	gologic 
 
 import (
 	"encoding/json"
