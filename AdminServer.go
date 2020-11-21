@@ -1,15 +1,29 @@
+<<<<<<< HEAD
 package	gologic 
+=======
+package gologic
+>>>>>>> dev
 
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/go-resty/resty"
 )
 
+/*
+AdminServer is a struct, which represents the Weblogic AdminServer.
+name: is the Admin Server Name
+ipAdress: is the IPv4 Address of the Server
+username: username of a Administration Account
+password: its the password of the account
+
+*/
 type AdminServer struct {
 	name        string
 	ipAdress    string
@@ -31,26 +45,35 @@ func (admin *AdminServer) sortedManagedList() []string {
 	return keys
 }
 
-func (admin *AdminServer) init() {
+//Init checks the connection to the AdminServer and it collect a list of ManagedServer from the AdminServer
+func Init(ip string, port int, username string, password string) AdminServer {
 	var resp *resty.Response
 	var err error
 	var result map[string]interface{}
+	var admin AdminServer
 
+	admin.ipAdress = ip
+	admin.port = port
+	admin.username = username
+	admin.password = password
+
+	//Create a list for the ManagedServer
 	admin.ManagedList = make(map[string]*ManagedServer, 30)
+
+	//Configure the REST Client
 	admin.Cli = resty.New()
 	admin.Cli.SetBasicAuth(admin.username, admin.password)
 	admin.Cli.SetDisableWarn(true)
 	admin.Cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port) + "/management/weblogic/latest")
 
+	//Check the status of the AdminServer
 	admin.checkAdminStatus()
 
-	resp, err = admin.Cli.R().
+	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
-		Get("/edit")
-
-	if err != nil {
+		Get("/edit"); err != nil {
 		panic(err)
 	}
 
@@ -58,12 +81,9 @@ func (admin *AdminServer) init() {
 
 	admin.name = result["adminServerName"].(string)
 
-	resp, err = admin.Cli.R().
-		EnableTrace().
+	if resp, err = admin.Cli.R().
 		SetHeader("Accept", "application/json").
-		Get("/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state")
-
-	if err != nil {
+		Get("/domainRuntime/serverLifeCycleRuntimes?links=none&fields=name,state"); err != nil {
 		panic(err)
 	}
 
@@ -79,23 +99,26 @@ func (admin *AdminServer) init() {
 				Cli:    admin.Cli}
 		}
 	}
+
+	return admin
 }
 
+//checkAdminStatus checks the status of the AdminServer
 func (admin *AdminServer) checkAdminStatus() {
-	_, err := admin.Cli.R().
+	if _, err := admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
-		Get("/")
-
-	if err != nil {
-		panic(err)
+		Get("/"); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	} else {
 		admin.statusAdmin = "RUNNING"
 	}
 }
 
-func (admin *AdminServer) getStatus() string {
+//GetStatus returns the AdminServer Status with color
+func (admin *AdminServer) GetStatus() string {
 	if admin.statusAdmin == "RUNNING" {
 		return "\033[32m[" + admin.statusAdmin + "]\033[0m"
 	} else if admin.statusAdmin == "SHUTDOWN" {
@@ -104,70 +127,121 @@ func (admin *AdminServer) getStatus() string {
 	return "\033[33m[" + admin.statusAdmin + "]\033[0m"
 }
 
-func (admin *AdminServer) start(nameList []string) {
+//Start starts a list of ManagedServer or when the list is empty, its stops every ManagedServer
+func (admin *AdminServer) Start(nameList []string) {
+	var err error
 	fmt.Println()
-	if nameList == nil {
+	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
-				admin.ManagedList[name].startMS()
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
+				if err = admin.ManagedList[name].StartMS(); err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				managedserver.startMS()
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+				managedserver.StartMS()
+				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
 			} else {
-				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
+				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
 	fmt.Println()
 }
 
-func (admin *AdminServer) stop(nameList []string) {
+//Stop stops a list of servers or when the list is empty, its stops every ManagedServer
+func (admin *AdminServer) Stop(nameList []string) {
+	var err error
+
 	fmt.Println()
-	if nameList == nil {
+	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
-				admin.ManagedList[name].stopMS()
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
+				if err = admin.ManagedList[name].StopMS(); err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				managedserver.stopMS()
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+				if err = managedserver.StopMS(); err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
 			} else {
-				fmt.Printf("%-40s %s \n", name, "Doesn't exists")
+				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
 	fmt.Println()
 }
 
-//A list of Managed Server can be passed to this receiver
-func (admin *AdminServer) printStatus(nameList []string) {
+//Deploy a Java Application to a specific cluster or server
+func (admin *AdminServer) Deploy(target []string, pathSlice []string) {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var targetJSON []byte
+	var err error
+
+	if targetJSON, err = json.Marshal(target); err != nil {
+		fmt.Println(err)
+	}
+
+	for _, path := range pathSlice {
+		filename := filepath.Base(path)
+		name := strings.TrimSuffix(filename, filepath.Ext(filename))
+
+		resp, err = admin.Cli.R().
+			SetHeader("Content-Type", "application/json").
+			SetHeader("Accept", "application/json").
+			SetHeader("X-Requested-By", "gologic").
+			SetBody(`{
+			name: ` + name + `,
+			applicationPath : '` + path + `',
+			targets: ` + string(targetJSON) + `,
+			plan: null,
+			deploymentOptions: {}
+		}`).
+			Post("/domainRuntime/deploymentManager/deploy")
+
+		if err != nil {
+			panic(err)
+		}
+
+		json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+		fmt.Println(resp)
+	}
+}
+
+//PrintStatus prints the status of all Servers or a list of specific servers
+func (admin *AdminServer) PrintStatus(nameList []string) {
 	fmt.Println()
-	if nameList == nil {
-		fmt.Printf("%-40s %-15s \n", admin.name, admin.getStatus())
+	if len(nameList) <= 0 {
+		fmt.Printf("%-40s %-15s \n", admin.name, admin.GetStatus())
 		fmt.Println()
 		fmt.Printf("---------------------------------------------------------\n")
 		fmt.Println()
 		for _, name := range admin.sortedManagedList() {
 			if name != "AdminServer" {
-				fmt.Printf("%-40s %s \n", name, admin.ManagedList[name].getStatus())
+				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				fmt.Printf("%-40s %s \n", name, managedserver.getStatus())
+				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
+			} else if name == admin.name {
+				fmt.Printf("%-40v %v \n", name, admin.GetStatus())
 			}
 		}
 
@@ -176,24 +250,24 @@ func (admin *AdminServer) printStatus(nameList []string) {
 
 }
 
-func (admin *AdminServer) printInfo() {
+//PrintInfo prints informations about the AdminServer
+func (admin *AdminServer) PrintInfo() {
 	var result map[string]interface{}
 	var resp *resty.Response
-	var err error
 
-	resp, err = admin.Cli.R().
+	resp, err := admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		Get("/domainConfig?links=none&fields=name,rootDirectory")
-
 	if err != nil {
 		panic(err)
 	}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
-	fmt.Printf("%-40s %s \n", "DomainName", result["name"].(string))
-	fmt.Printf("%-40s %s \n", "DomainHome", result["rootDirectory"].(string))
+	fmt.Printf("%-40v %v \n", "AdminServer", admin.ipAdress+":"+strconv.Itoa(admin.port))
+	fmt.Printf("%-40v %v \n", "DomainName", result["name"])
+	fmt.Printf("%-40v %v \n", "DomainHome", result["rootDirectory"])
 
 	resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
@@ -205,48 +279,79 @@ func (admin *AdminServer) printInfo() {
 	}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
-	fmt.Printf("%-40s %s\n", "Java Version", result["javaVersion"].(string))
-	fmt.Printf("%-40s %s %s\n", "OS Version", result["OSName"].(string), result["OSVersion"].(string))
+	fmt.Printf("%-40v %v\n", "JavaVersion", result["javaVersion"])
+	fmt.Printf("%-40v %v %v\n", "OSVersion", result["OSName"], result["OSVersion"])
 }
 
-func (admin *AdminServer) createManagedServer(name string, listenAddress string, listenPort string) {
+//PrintDeployments prints a list of Deployments
+func (admin *AdminServer) PrintDeployments() {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	resp, err = admin.Cli.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		Get("/serverConfig/appDeployments?links=none")
+
+	if err != nil {
+		panic(err)
+	}
+
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	switch items := result["items"].(type) {
+	case nil:
+		panic(resp)
+	case []interface{}:
+		if len(items) > 0 {
+			for _, value := range items {
+				applicationEntry := value.(map[string]interface{})
+				fmt.Printf("%-45v %-10v %-5v %-70v %-20v\n", applicationEntry["applicationName"], applicationEntry["versionIdentifier"], applicationEntry["moduleType"], applicationEntry["sourcePath"], "asdf")
+			}
+
+		} else {
+			fmt.Println("No Deployments found")
+		}
+	default:
+		fmt.Println("type unknown") // here v has type interface{}
+	}
+}
+
+//CreateManagedServer creates a ManagedServer with the parameter name (name of the server), listenAddress, listenPort
+func (admin *AdminServer) CreateManagedServer(name string, listenAddress string, listenPort string) {
 	var result map[string]interface{}
 	var resp *resty.Response
 	var err error
 
 	//Get a form to create a managed server
-	resp, err = admin.Cli.R().
+	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody("{}").
-		Post("/edit/changeManager/startEdit")
-
-	if err != nil {
+		Post("/edit/changeManager/StartEdit"); err != nil {
 		panic(err)
 	}
 
 	//Get a form to create a managed server
-	resp, err = admin.Cli.R().
+	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
-		Get("/edit/serverCreateForm?links=none")
-
-	if err != nil {
+		Get("/edit/serverCreateForm?links=none"); err != nil {
 		panic(err)
 	}
 
 	fmt.Printf("Creating server (%v, %v, %v)\n", name, listenAddress, listenPort)
 
-	resp, err = admin.Cli.R().
+	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody(`{ "name":"` + name + `", "listenAddress":"` + listenAddress + `", "listenPort":` + listenPort + `}`).
-		Post("/edit/servers")
-
-	if err != nil {
+		Post("/edit/servers"); err != nil {
 		panic(err)
 	}
 
@@ -260,14 +365,12 @@ func (admin *AdminServer) createManagedServer(name string, listenAddress string,
 		}
 	}
 
-	resp, err = admin.Cli.R().
+	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody("{}").
-		Post("/edit/changeManager/activate")
-
-	if err != nil {
+		Post("/edit/changeManager/activate"); err != nil {
 		panic(err)
 	}
 

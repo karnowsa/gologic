@@ -4,32 +4,40 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/go-resty/resty"
 )
 
+/*ManagedServer is a a struct to save Weblogic ManagedServer
+Name: It has a name
+Status: And a status with color (Running, Shutdown...)
+*/
 type ManagedServer struct {
 	Name   string
 	Status string
 	Cli    *resty.Client
 }
 
-func (ms *ManagedServer) getStatus() string {
+//GetStatus returns the status of the ManagedServer with colors
+func (ms *ManagedServer) GetStatus() string {
 	if ms.Status == "RUNNING" {
 		return "\033[32m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "SHUTDOWN" {
 		return "\033[31m[" + ms.Status + "]\033[0m"
 	} else if ms.Status == "TASK IN PROGRESS" {
 		return "\033[33m[" + ms.Status + "]\033[0m"
-	} else if ms.Status == "STARTING" {
+	} else if ms.Status == "StartING" {
 		return "\033[36m[" + ms.Status + "]\033[0m"
 	}
 	return "\033[33m[" + ms.Status + "]\033[0m"
 }
 
-func (ms *ManagedServer) startMS() {
+//StartMS starts a list of ManagedServer, when its empty then its starts all ManagedServer
+func (ms *ManagedServer) StartMS() error {
 	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
 
-	resp, err := ms.Cli.R().
+	if resp, err = ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
 		}).
@@ -38,9 +46,7 @@ func (ms *ManagedServer) startMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start")
-
-	if err != nil {
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start"); err != nil {
 		panic(err)
 	}
 
@@ -56,17 +62,22 @@ func (ms *ManagedServer) startMS() {
 			if statusCode == 400 {
 				ms.Status = "RUNNING"
 			} else {
-				panic(statusCode)
+				return fmt.Errorf("StartMS() HTTP Statuscode is %v", statusCode)
 			}
 		} else {
-			panic(ok)
+			return fmt.Errorf("StartMS() ok is %v", ok)
 		}
 	}
-
+	return nil
 }
 
-func (ms *ManagedServer) stopMS() {
-	resp, err := ms.Cli.R().
+//StopMS stops a list of ManagedServer, when its empty then its Stops all ManagedServer
+func (ms *ManagedServer) StopMS() error {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	if resp, err = ms.Cli.R().
 		SetPathParams(map[string]string{
 			"managedServerName": ms.Name,
 		}).
@@ -75,13 +86,9 @@ func (ms *ManagedServer) stopMS() {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
-		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown")
-
-	if err != nil {
-		panic(err)
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown"); err != nil {
+		return err
 	}
-
-	var result map[string]interface{}
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
 
 	taskStatus, ok := result["taskStatus"].(string)
@@ -94,10 +101,11 @@ func (ms *ManagedServer) stopMS() {
 			if statusCode == 400 {
 				ms.Status = "SHUTDOWN"
 			} else {
-				panic(statusCode)
+				return fmt.Errorf("StopMS() HTTP Statuscode is %v", statusCode)
 			}
 		} else {
-			panic(ok)
+			return fmt.Errorf("StopMS() ok is %v", ok)
 		}
 	}
+	return nil
 }
