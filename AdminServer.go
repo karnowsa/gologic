@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-package	gologic 
-=======
 package gologic
->>>>>>> dev
 
 import (
 	"encoding/json"
@@ -13,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-resty/resty"
+	"github.com/go-resty/resty/v2"
 )
 
 /*
