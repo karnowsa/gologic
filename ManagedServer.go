@@ -1,10 +1,10 @@
-package github.com/karnowsa/gologic
+package gologic
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/go-resty/resty"
 )
 
 /*ManagedServer is a a struct to save Weblogic ManagedServer

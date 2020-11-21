@@ -1,14 +1,15 @@
-package	github.com/karnowsa/gologic 
+package gologic
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/go-resty/resty"
 )
 
 /*
@@ -191,12 +192,15 @@ func (admin *AdminServer) Deploy(target []string, pathSlice []string) {
 	}
 
 	for _, path := range pathSlice {
+		filename := filepath.Base(path)
+		name := strings.TrimSuffix(filename, filepath.Ext(filename))
+
 		resp, err = admin.Cli.R().
 			SetHeader("Content-Type", "application/json").
 			SetHeader("Accept", "application/json").
 			SetHeader("X-Requested-By", "gologic").
 			SetBody(`{
-			name: null,
+			name: ` + name + `,
 			applicationPath : '` + path + `',
 			targets: ` + string(targetJSON) + `,
 			plan: null,
@@ -246,14 +250,12 @@ func (admin *AdminServer) PrintStatus(nameList []string) {
 func (admin *AdminServer) PrintInfo() {
 	var result map[string]interface{}
 	var resp *resty.Response
-	var err error
 
-	resp, err = admin.Cli.R().
+	resp, err := admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		Get("/domainConfig?links=none&fields=name,rootDirectory")
-
 	if err != nil {
 		panic(err)
 	}
@@ -313,73 +315,39 @@ func (admin *AdminServer) PrintDeployments() {
 	}
 }
 
-<<<<<<< HEAD
 //CreateManagedServer creates a ManagedServer with the parameter name (name of the server), listenAddress, listenPort
 func (admin *AdminServer) CreateManagedServer(name string, listenAddress string, listenPort string) {
-=======
-func (admin *AdminServer) createManagedServer(name string, listenAddress string, listenPort string) {
->>>>>>> master
 	var result map[string]interface{}
 	var resp *resty.Response
 	var err error
 
 	//Get a form to create a managed server
-<<<<<<< HEAD
 	if resp, err = admin.Cli.R().
-=======
-	resp, err = admin.Cli.R().
->>>>>>> master
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody("{}").
-<<<<<<< HEAD
 		Post("/edit/changeManager/StartEdit"); err != nil {
-=======
-		Post("/edit/changeManager/startEdit")
-
-	if err != nil {
->>>>>>> master
 		panic(err)
 	}
 
 	//Get a form to create a managed server
-<<<<<<< HEAD
 	if resp, err = admin.Cli.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		Get("/edit/serverCreateForm?links=none"); err != nil {
-=======
-	resp, err = admin.Cli.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json").
-		SetHeader("X-Requested-By", "gologic").
-		Get("/edit/serverCreateForm?links=none")
-
-	if err != nil {
->>>>>>> master
 		panic(err)
 	}
 
 	fmt.Printf("Creating server (%v, %v, %v)\n", name, listenAddress, listenPort)
 
-<<<<<<< HEAD
 	if resp, err = admin.Cli.R().
-=======
-	resp, err = admin.Cli.R().
->>>>>>> master
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody(`{ "name":"` + name + `", "listenAddress":"` + listenAddress + `", "listenPort":` + listenPort + `}`).
-<<<<<<< HEAD
 		Post("/edit/servers"); err != nil {
-=======
-		Post("/edit/servers")
-
-	if err != nil {
->>>>>>> master
 		panic(err)
 	}
 
@@ -393,22 +361,12 @@ func (admin *AdminServer) createManagedServer(name string, listenAddress string,
 		}
 	}
 
-<<<<<<< HEAD
 	if resp, err = admin.Cli.R().
-=======
-	resp, err = admin.Cli.R().
->>>>>>> master
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept", "application/json").
 		SetHeader("X-Requested-By", "gologic").
 		SetBody("{}").
-<<<<<<< HEAD
 		Post("/edit/changeManager/activate"); err != nil {
-=======
-		Post("/edit/changeManager/activate")
-
-	if err != nil {
->>>>>>> master
 		panic(err)
 	}
 
