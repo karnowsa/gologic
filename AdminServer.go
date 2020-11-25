@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -47,6 +48,7 @@ func Init(ip string, port int, username string, password string) AdminServer {
 	var err error
 	var result map[string]interface{}
 	var admin AdminServer
+	var wg sync.WaitGroup
 
 	admin.ipAdress = ip
 	admin.port = port
@@ -89,13 +91,17 @@ func Init(ip string, port int, username string, password string) AdminServer {
 
 	for _, value := range items {
 		if value.(map[string]interface{})["name"].(string) != admin.name {
-			admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
-				Name:   value.(map[string]interface{})["name"].(string),
-				Status: value.(map[string]interface{})["state"].(string),
-				Cli:    admin.Cli}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
+					Name:   value.(map[string]interface{})["name"].(string),
+					Status: value.(map[string]interface{})["state"].(string),
+					Cli:    admin.Cli}
+			}()
 		}
 	}
-
+	wg.Wait()
 	return admin
 }
 
@@ -125,58 +131,78 @@ func (admin *AdminServer) GetStatus() string {
 
 //Start starts a list of ManagedServer or when the list is empty, its stops every ManagedServer
 func (admin *AdminServer) Start(nameList []string) {
+	var wg sync.WaitGroup
 	var err error
 	fmt.Println()
 	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
+			wg.Add(1)
 			if name != "AdminServer" {
-				if err = admin.ManagedList[name].StartMS(); err != nil {
-					panic(err)
-				}
-				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
+				go func() {
+					defer wg.Done()
+					if err = admin.ManagedList[name].StartMS(); err != nil {
+						panic(err)
+					}
+					fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
+				}()
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				managedserver.StartMS()
-				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					managedserver.StartMS()
+					fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
+				}()
 			} else {
 				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
+	wg.Wait()
 	fmt.Println()
 }
 
 //Stop stops a list of servers or when the list is empty, its stops every ManagedServer
 func (admin *AdminServer) Stop(nameList []string) {
 	var err error
+	var wg sync.WaitGroup
 
 	fmt.Println()
 	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
-				if err = admin.ManagedList[name].StopMS(); err != nil {
-					panic(err)
-				}
-				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err = admin.ManagedList[name].StopMS(); err != nil {
+						panic(err)
+					}
+					fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
+				}()
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				if err = managedserver.StopMS(); err != nil {
-					panic(err)
-				}
-				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err = managedserver.StopMS(); err != nil {
+						panic(err)
+					}
+					fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
+				}()
 			} else {
 				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
+	wg.Wait()
 	fmt.Println()
 }
 

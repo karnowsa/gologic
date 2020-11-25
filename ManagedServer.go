@@ -47,7 +47,7 @@ func (ms *ManagedServer) StartMS() error {
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
 		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/start"); err != nil {
-		panic(err)
+		return err
 	}
 
 	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
