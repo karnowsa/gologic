@@ -86,6 +86,44 @@ func (ms *ManagedServer) StopMS() error {
 		SetHeader("X-Requested-By", "gologic").
 		SetHeader("Prefer", "respond-async").
 		SetBody("{}").
+		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/shutdown"); err != nil {
+		return err
+	}
+	json.Unmarshal([]byte(fmt.Sprintf("%v", resp)), &result)
+
+	taskStatus, ok := result["taskStatus"].(string)
+
+	if ok {
+		ms.Status = taskStatus
+	} else {
+		statusCode, ok := result["status"].(float64)
+		if ok {
+			if statusCode == 400 {
+				ms.Status = "SHUTDOWN"
+			} else {
+				return fmt.Errorf("StopMS() HTTP Statuscode is %v", statusCode)
+			}
+		} else {
+			return fmt.Errorf("StopMS() ok is %v", ok)
+		}
+	}
+	return nil
+}
+
+func (ms *ManagedServer) ForceStopMS() error {
+	var result map[string]interface{}
+	var resp *resty.Response
+	var err error
+
+	if resp, err = ms.Cli.R().
+		SetPathParams(map[string]string{
+			"managedServerName": ms.Name,
+		}).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetHeader("X-Requested-By", "gologic").
+		SetHeader("Prefer", "respond-async").
+		SetBody("{}").
 		Post("/domainRuntime/serverLifeCycleRuntimes/{managedServerName}/forceShutdown"); err != nil {
 		return err
 	}

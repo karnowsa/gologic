@@ -42,8 +42,8 @@ func (admin *AdminServer) sortedManagedList() []string {
 	return keys
 }
 
-//Init checks the connection to the AdminServer and it collect a list of ManagedServer from the AdminServer
-func Init(ip string, port int, username string, password string) AdminServer {
+//LoginAdminServer checks the connection to the AdminServer and it collect a list of ManagedServer from the AdminServer
+func LoginAdminServer(ip string, port int, username string, password string) AdminServer {
 	var resp *resty.Response
 	var err error
 	var result map[string]interface{}
@@ -167,8 +167,7 @@ func (admin *AdminServer) Start(nameList []string) {
 }
 
 //Stop stops a list of servers or when the list is empty, its stops every ManagedServer
-func (admin *AdminServer) Stop(nameList []string) {
-	var err error
+func (admin *AdminServer) Stop(nameList []string, force bool) {
 	var wg sync.WaitGroup
 
 	fmt.Println()
@@ -177,8 +176,14 @@ func (admin *AdminServer) Stop(nameList []string) {
 			if name != "AdminServer" {
 				wg.Add(1)
 				go func() {
+					var err error
 					defer wg.Done()
-					if err = admin.ManagedList[name].StopMS(); err != nil {
+					if force {
+						err = admin.ManagedList[name].ForceStopMS()
+					} else {
+						err = admin.ManagedList[name].StopMS()
+					}
+					if err != nil {
 						panic(err)
 					}
 					fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
@@ -191,6 +196,7 @@ func (admin *AdminServer) Stop(nameList []string) {
 			if ok {
 				wg.Add(1)
 				go func() {
+					var err error
 					defer wg.Done()
 					if err = managedserver.StopMS(); err != nil {
 						panic(err)
