@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -48,7 +48,6 @@ func LoginAdminServer(ip string, port int, username string, password string) Adm
 	var err error
 	var result map[string]interface{}
 	var admin AdminServer
-	var wg sync.WaitGroup
 
 	admin.ipAdress = ip
 	admin.port = port
@@ -63,6 +62,9 @@ func LoginAdminServer(ip string, port int, username string, password string) Adm
 	admin.Cli.SetBasicAuth(admin.username, admin.password)
 	admin.Cli.SetDisableWarn(true)
 	admin.Cli.SetHostURL("http://" + admin.ipAdress + ":" + strconv.Itoa(admin.port) + "/management/weblogic/latest")
+	// Remove Proxy Settings, Resty uses by default proxy configurations
+	admin.Cli.RemoveProxy()
+	admin.Cli.SetTimeout(1 * time.Minute)
 
 	//Check the status of the AdminServer
 	admin.checkAdminStatus()
@@ -91,17 +93,13 @@ func LoginAdminServer(ip string, port int, username string, password string) Adm
 
 	for _, value := range items {
 		if value.(map[string]interface{})["name"].(string) != admin.name {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
-					Name:   value.(map[string]interface{})["name"].(string),
-					Status: value.(map[string]interface{})["state"].(string),
-					Cli:    admin.Cli}
-			}()
+
+			admin.ManagedList[value.(map[string]interface{})["name"].(string)] = &ManagedServer{
+				Name:   value.(map[string]interface{})["name"].(string),
+				Status: value.(map[string]interface{})["state"].(string),
+				Cli:    admin.Cli}
 		}
 	}
-	wg.Wait()
 	return admin
 }
 
@@ -131,84 +129,70 @@ func (admin *AdminServer) GetStatus() string {
 
 //Start starts a list of ManagedServer or when the list is empty, its stops every ManagedServer
 func (admin *AdminServer) Start(nameList []string) {
-	var wg sync.WaitGroup
 	var err error
 	fmt.Println()
 	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
-			wg.Add(1)
 			if name != "AdminServer" {
-				go func() {
-					defer wg.Done()
-					if err = admin.ManagedList[name].StartMS(); err != nil {
-						panic(err)
-					}
-					fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
-				}()
+				if err = admin.ManagedList[name].StartMS(); err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					managedserver.StartMS()
-					fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
-				}()
+				managedserver.StartMS()
+				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
 			} else {
 				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
-	wg.Wait()
 	fmt.Println()
 }
 
 //Stop stops a list of servers or when the list is empty, its stops every ManagedServer
 func (admin *AdminServer) Stop(nameList []string, force bool) {
-	var wg sync.WaitGroup
 
 	fmt.Println()
+
+	if force {
+		fmt.Println("\033[31m[FORCE MODE]\033[0m")
+		fmt.Println()
+	}
+
 	if len(nameList) <= 0 {
 		for name := range admin.ManagedList {
 			if name != "AdminServer" {
-				wg.Add(1)
-				go func() {
-					var err error
-					defer wg.Done()
-					if force {
-						err = admin.ManagedList[name].ForceStopMS()
-					} else {
-						err = admin.ManagedList[name].StopMS()
-					}
-					if err != nil {
-						panic(err)
-					}
-					fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
-				}()
+				var err error
+				if force {
+					err = admin.ManagedList[name].ForceStopMS()
+				} else {
+					err = admin.ManagedList[name].StopMS()
+				}
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, admin.ManagedList[name].GetStatus())
 			}
 		}
 	} else {
 		for _, name := range nameList {
 			managedserver, ok := admin.ManagedList[name]
 			if ok {
-				wg.Add(1)
-				go func() {
-					var err error
-					defer wg.Done()
-					if err = managedserver.StopMS(); err != nil {
-						panic(err)
-					}
-					fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
-				}()
+				var err error
+				if err = managedserver.StopMS(); err != nil {
+					panic(err)
+				}
+				fmt.Printf("%-40v %v \n", name, managedserver.GetStatus())
 			} else {
 				fmt.Printf("%-40v %v \n", name, "Doesn't exists")
 			}
 		}
 	}
-	wg.Wait()
 	fmt.Println()
 }
 
@@ -236,8 +220,7 @@ func (admin *AdminServer) Deploy(target []string, pathSlice []string) {
 			applicationPath : '` + path + `',
 			targets: ` + string(targetJSON) + `,
 			plan: null,
-			deploymentOptions: {}
-		}`).
+			deploymentOptions: {}}`).
 			Post("/domainRuntime/deploymentManager/deploy")
 
 		if err != nil {
@@ -312,7 +295,7 @@ func (admin *AdminServer) PrintInfo() {
 }
 
 //PrintDeployments prints a list of Deployments
-func (admin *AdminServer) PrintDeployments() {
+func (admin *AdminServer) PrintDeployments(brief bool) {
 	var result map[string]interface{}
 	var resp *resty.Response
 	var err error
@@ -336,7 +319,21 @@ func (admin *AdminServer) PrintDeployments() {
 		if len(items) > 0 {
 			for _, value := range items {
 				applicationEntry := value.(map[string]interface{})
-				fmt.Printf("%-45v %-10v %-5v %-70v %-20v\n", applicationEntry["applicationName"], applicationEntry["versionIdentifier"], applicationEntry["moduleType"], applicationEntry["sourcePath"], "asdf")
+				if brief {
+					fmt.Printf(
+						"%-45v %-10v %-5v\n",
+						applicationEntry["applicationName"],
+						applicationEntry["versionIdentifier"],
+						applicationEntry["moduleType"])
+				} else {
+					fmt.Printf(
+						"%-45v %-10v %-5v %-70v %-20v\n",
+						applicationEntry["applicationName"],
+						applicationEntry["versionIdentifier"],
+						applicationEntry["moduleType"],
+						applicationEntry["sourcePath"], "asdf")
+				}
+
 			}
 
 		} else {
